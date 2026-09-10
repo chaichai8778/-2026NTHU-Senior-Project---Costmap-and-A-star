@@ -1,5 +1,6 @@
 import math
 
+wheel_base = 0.195  # m
 def obs_pos(distance, angle_degrees):
     angle_radians = math.radians(angle_degrees)
 
@@ -29,6 +30,21 @@ def car_position(car_x, car_y, car_theta, deltaSL, deltaSR):
        car_theta +=360
 
     return car_x, car_y, car_theta
+
+def error_calculation(car_x, car_y, car_theta, goal_x, goal_y):
+    dx = goal_x - car_x;
+    dy = goal_y - car_y;
+    if dx==0 and dy==0:
+        errordistance = 0;
+        errorAngle = 0;
+    else:
+        errordistance = math.hypot(dx, dy) / 100;
+        targetAngle = -math.atan2(dy, dx) * 180 / math.pi;
+        errorAngle = targetAngle - car_theta; 
+        while (errorAngle > 180.0):  errorAngle -= 360.0;
+        while (errorAngle < -180.0):  errorAngle += 360.0;
+    
+    return errordistance, errorAngle
 
 def world_to_pixel(CENTER_X, CENTER_Y, x, y, GRID_SIZE):
     """

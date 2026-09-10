@@ -3,10 +3,14 @@ import sys
 import serial
 import time
 import costmap, caculation, draw, read_arduino
+import math
 from planner import Plan
-import struct
 
 pygame.init()
+
+wheel_perimeter = 0.0675*math.pi;  
+wheel_radius = 0.0675/2;
+wheel_base = 0.195;
 
 # Arduino Serial Port 
 COM_PORT = 'COM5'  
@@ -22,6 +26,8 @@ WINDOW_HEIGHT = 600
 CENTER_X = WINDOW_WIDTH // 2
 CENTER_Y = WINDOW_HEIGHT // 2
 GRID_SIZE = 4
+
+state = (car_theta, car_x, car_y, goal_x, goal_y, path_cells)
 
 screen_size = (WINDOW_WIDTH, WINDOW_HEIGHT, CENTER_X, CENTER_Y, GRID_SIZE)
 
@@ -121,14 +127,33 @@ try:
 
             if path_cells and len(path_cells) > 1:
                 next_target = path_cells[1] 
-                target_x = int(next_target[0])
-                target_y = int(next_target[1])
-                print(f"{int(car_x)},{int(car_y)},{target_x},{target_y}\n")
-                send_string = f"{int(car_x)},{int(car_y)},{target_x},{target_y}\n" 
+                goal_x = int(next_target[0])
+                goal_y = int(next_target[1])
+                errordistance, errorAngle = caculation.error_calculation(car_x, car_y, car_theta, goal_x, goal_y)
+
+                if abs(errordistance) > 0.02:
+                    target_v = 1.7 * errordistance
+                    target_v = max(0, min(target_v, 0.24))  
+                    base_linear_RPM = (target_v / wheel_perimeter) * 60.0
+                    linear_RPM = base_linear_RPM * linear_factor
+                else:
+                    target_v = 0
+                    linear_RPM = 0
+                if abs(errorAngle) > 2.0:
+                    target_w = 4.3*errorAngle
+                    target_w = max(-90, min(target_w, 90))
+                    linear_factor = 1.0 - pow((min(abs(errorAngle), 180.0) / 180.0),2)
+                    rotate_RPM = target_w * wheel_base / (wheel_radius * 12)
+                else:
+                    target_w = 0
+                    rotate_RPM = 0
+
+                print(f"{int(linear_RPM)},{int(rotate_RPM)}\n")
+                send_string = f"{int(linear_RPM)},{int(rotate_RPM)}\n"
                 ser.write(send_string.encode('utf-8'))
                     
             else:
-                send_string = f"{car_x},{car_y},{car_x},{car_y}\n"
+                send_string = f"{0},{0}\n"
                 ser.write(send_string.encode('utf-8'))
 
         #base map
